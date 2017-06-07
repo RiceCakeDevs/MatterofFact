@@ -1,13 +1,10 @@
 package com.roc.matteroffact;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Environment;
 import android.support.annotation.NonNull;
@@ -15,7 +12,6 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.AlphaAnimation;
@@ -27,7 +23,6 @@ import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.request.target.Target;
 import com.firebase.ui.storage.images.FirebaseImageLoader;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -42,7 +37,7 @@ import java.util.Date;
 public class MainActivity extends AppCompatActivity {
 
     // TODO : Replace this with our URL
-    public static final String SRC_URL = "our_url_here";
+    public static final String SRC_URL = "gs://matteroffact-3c98e.appspot.com/";
     private static final String SRC_IMAGE_PATH = "Test/displayImage.jpg";
     private static final String DISPLAY_IMAGE_NAME = "displayImage.jpg";
 
@@ -53,10 +48,9 @@ public class MainActivity extends AppCompatActivity {
     Bitmap mDisplayImage = null;
     RelativeLayout mOptionsView;
     ImageView mDisplayView;
-    ImageButton mShareButton, mDownloadButton;
+    ImageButton mShareButton, mDownloadButton, mWallpaperButton;
     ProgressBar mProgressBar;
 
-    // TODO : Implement splash screen
     // TODO : App logo?
     // TODO : hide options view onResume if download not in progress
     // TODO : Don't use hardcoded strings in java or xml
@@ -79,12 +73,13 @@ public class MainActivity extends AppCompatActivity {
         mShareButton = (ImageButton) findViewById(R.id.button_share_image);
         mDownloadButton = (ImageButton) findViewById(R.id.button_download_image);
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
+        mWallpaperButton = (ImageButton) findViewById(R.id.button_set_wallpaper);
     }
 
     private void initStorageReference() {
 
         // TODO : Handle network connectivity issues.
-        mSourceStorageReference =  FirebaseStorage.getInstance().getReferenceFromUrl(SRC_URL);
+        mSourceStorageReference = FirebaseStorage.getInstance().getReferenceFromUrl(SRC_URL);
         mImageStorageReference = mSourceStorageReference.child(SRC_IMAGE_PATH);
     }
 
@@ -99,9 +94,9 @@ public class MainActivity extends AppCompatActivity {
 
     public void handleClick(View v) {
 
-        switch(v.getId()) {
+        switch (v.getId()) {
 
-            case R.id.display_image : {
+            case R.id.display_image: {
                 if (!mOptionsView.isShown()) {
                     fadeInAndShowImage(mOptionsView);
                 } else {
@@ -113,16 +108,17 @@ public class MainActivity extends AppCompatActivity {
             case R.id.button_share_image: {
 
                 File dir1 = getFilesDir();
-                String[] children = dir1 .list();
+                String[] children = dir1.list();
                 for (String child : children) {
-                        new File(dir1 , child).delete();
-                    }
+                    new File(dir1, child).delete();
+                }
 
                 final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
                 final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
                 mShareButton.setClickable(false);
                 mDownloadButton.setClickable(false);
                 mDisplayView.setClickable(false);
+                mWallpaperButton.setClickable(false);
                 mProgressBar.setVisibility(View.VISIBLE);
 
                 mImageStorageReference.getFile(displayImage)
@@ -153,14 +149,59 @@ public class MainActivity extends AppCompatActivity {
             }
             break;
 
-            case R.id.button_download_image : {
+            case R.id.button_download_image: {
 
-                if(!isStoragePermissionGranted()) {
+                if (!isStoragePermissionGranted()) {
                     mIsDownloadPending = true;
                     return;
                 }
 
                 downloadImage();
+            }
+            break;
+
+            case R.id.button_set_wallpaper: {
+                File dir1 = getFilesDir();
+                String[] children = dir1.list();
+                for (String child : children) {
+                    new File(dir1, child).delete();
+                }
+
+                final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+                final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
+                mShareButton.setClickable(false);
+                mDownloadButton.setClickable(false);
+                mDisplayView.setClickable(false);
+                mWallpaperButton.setClickable(false);
+                mProgressBar.setVisibility(View.VISIBLE);
+
+                mImageStorageReference.getFile(displayImage)
+                        .addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                            @Override
+                            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+
+                                Uri uri = FileProvider.getUriForFile(getApplicationContext(),
+                                        getApplicationContext().getPackageName(), displayImage);
+                                setWall(uri); // startActivity probably needs UI thread
+                                mShareButton.setClickable(true);
+                                mDownloadButton.setClickable(true);
+                                mDisplayView.setClickable(true);
+                                mWallpaperButton.setClickable(true);
+                                mProgressBar.setVisibility(View.GONE);
+                                fadeOutAndHideImage(mOptionsView);
+                            }
+                        }).addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        // TODO : Handle failed download
+                        mShareButton.setClickable(true);
+                        mDownloadButton.setClickable(true);
+                        mDisplayView.setClickable(true);
+                        mWallpaperButton.setClickable(true);
+                        mProgressBar.setVisibility(View.GONE);
+                        fadeOutAndHideImage(mOptionsView);
+                    }
+                });
             }
             break;
 
@@ -196,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
                         fadeOutAndHideImage(mOptionsView);
 
                         MediaScannerConnection.scanFile(getApplicationContext(),
-                                new String[] {displayImage.getAbsolutePath()}, new String[] {"image/jpeg"}, null);
+                                new String[]{displayImage.getAbsolutePath()}, new String[]{"image/jpeg"}, null);
                     }
                 }).addOnFailureListener(new OnFailureListener() {
             @Override
@@ -221,20 +262,30 @@ public class MainActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(intent, "Share image"));
     }
 
-    private void fadeOutAndHideImage(final View img)
-    {
+    private void setWall(Uri result) {
+        Intent intent = new Intent(Intent.ACTION_ATTACH_DATA);
+        intent.setDataAndType(result, "image/*");
+        intent.putExtra("mimeType", "image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(
+                intent, "Set as:"));
+    }
+
+    private void fadeOutAndHideImage(final View img) {
         Animation fadeOut = new AlphaAnimation(1, 0);
         fadeOut.setInterpolator(new AccelerateInterpolator());
         fadeOut.setDuration(350);
 
-        fadeOut.setAnimationListener(new Animation.AnimationListener()
-        {
-            public void onAnimationEnd(Animation animation)
-            {
+        fadeOut.setAnimationListener(new Animation.AnimationListener() {
+            public void onAnimationEnd(Animation animation) {
                 img.setVisibility(View.GONE);
             }
-            public void onAnimationRepeat(Animation animation) {}
-            public void onAnimationStart(Animation animation) {}
+
+            public void onAnimationRepeat(Animation animation) {
+            }
+
+            public void onAnimationStart(Animation animation) {
+            }
         });
 
         img.startAnimation(fadeOut);
@@ -247,17 +298,21 @@ public class MainActivity extends AppCompatActivity {
         fadeIn.setInterpolator(new AccelerateInterpolator());
         fadeIn.setDuration(250);
 
-        fadeIn.setAnimationListener(new Animation.AnimationListener()
-        {
-            public void onAnimationEnd(Animation animation) {}
-            public void onAnimationRepeat(Animation animation) {}
-            public void onAnimationStart(Animation animation) {}
+        fadeIn.setAnimationListener(new Animation.AnimationListener() {
+            public void onAnimationEnd(Animation animation) {
+            }
+
+            public void onAnimationRepeat(Animation animation) {
+            }
+
+            public void onAnimationStart(Animation animation) {
+            }
         });
 
         img.startAnimation(fadeIn);
     }
 
-    public  boolean isStoragePermissionGranted() {
+    public boolean isStoragePermissionGranted() {
         if (Build.VERSION.SDK_INT >= 23) {
             if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     == PackageManager.PERMISSION_GRANTED) {
@@ -267,8 +322,7 @@ public class MainActivity extends AppCompatActivity {
                 ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
                 return false;
             }
-        }
-        else { //permission is automatically granted on sdk<23 upon installation
+        } else { //permission is automatically granted on sdk<23 upon installation
             return true;
         }
     }
@@ -276,7 +330,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if(grantResults[0]== PackageManager.PERMISSION_GRANTED && mIsDownloadPending){
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED && mIsDownloadPending) {
             //resume tasks needing this permission
             downloadImage();
         } else {
