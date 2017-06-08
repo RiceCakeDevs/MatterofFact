@@ -18,9 +18,19 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/logo"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="180dp"
+        android:layout_marginTop="170dp"
         android:text="@string/tag"
         android:textSize="25sp"
         android:textStyle="bold" />
+
+    <TextView
+    android:id="@+id/mini_message"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_below="@+id/logo"
+    android:layout_centerHorizontal="true"
+    android:layout_marginTop="200dp"
+    android:textSize="15sp"
+    android:textStyle="bold" />
 
 </RelativeLayout>

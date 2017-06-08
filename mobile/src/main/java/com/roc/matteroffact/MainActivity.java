@@ -51,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     ImageButton mShareButton, mDownloadButton, mWallpaperButton;
     ProgressBar mProgressBar;
 
+    // TODO : Add wallpaper options
     // TODO : App logo?
     // TODO : hide options view onResume if download not in progress
     // TODO : Don't use hardcoded strings in java or xml

@@ -14,15 +14,18 @@ import android.widget.TextView;
 public class SplashActivity extends Activity {
 
     // Splash screen timer
-    private static int SPLASH_TIME_OUT = 2500;
+    private static int SPLASH_TIME_OUT = 3500;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
+        TextView miniMessage = (TextView) findViewById(R.id.mini_message);
         TextView tag = (TextView) findViewById(R.id.tag);
         Typeface font = Typeface.createFromAsset(getAssets(), "fonts/Asap-Medium.otf");
         tag.setTypeface(font);
+        miniMessage.setTypeface(font);
+        miniMessage.setText(R.string.mini_message);
 
         new Handler().postDelayed(new Runnable() {
 

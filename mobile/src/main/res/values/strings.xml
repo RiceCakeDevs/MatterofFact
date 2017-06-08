@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Matter of Fact</string>
     <string name="tag">#MatterOfFact</string>
+    <string name="mini_message">A fact a day, keeps "Mr. KnowItAll away!"</string>
 </resources>
