@@ -108,18 +108,11 @@ public class MainActivity extends AppCompatActivity {
 
             case R.id.button_share_image: {
 
-                File dir1 = getFilesDir();
-                String[] children = dir1.list();
-                for (String child : children) {
-                    new File(dir1, child).delete();
-                }
+                clearAppCache();
 
                 final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
                 final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
-                mShareButton.setClickable(false);
-                mDownloadButton.setClickable(false);
-                mDisplayView.setClickable(false);
-                mWallpaperButton.setClickable(false);
+                clickEvents(false);
                 mProgressBar.setVisibility(View.VISIBLE);
 
                 mImageStorageReference.getFile(displayImage)
@@ -130,9 +123,7 @@ public class MainActivity extends AppCompatActivity {
                                 Uri uri = FileProvider.getUriForFile(getApplicationContext(),
                                         getApplicationContext().getPackageName(), displayImage);
                                 share(uri); // startActivity probably needs UI thread
-                                mShareButton.setClickable(true);
-                                mDownloadButton.setClickable(true);
-                                mDisplayView.setClickable(true);
+                                clickEvents(true);
                                 mProgressBar.setVisibility(View.GONE);
                                 fadeOutAndHideImage(mOptionsView);
                             }
@@ -140,9 +131,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(@NonNull Exception exception) {
                         // TODO : Handle failed download
-                        mShareButton.setClickable(true);
-                        mDownloadButton.setClickable(true);
-                        mDisplayView.setClickable(true);
+                        clickEvents(true);
                         mProgressBar.setVisibility(View.GONE);
                         fadeOutAndHideImage(mOptionsView);
                     }
@@ -162,18 +151,12 @@ public class MainActivity extends AppCompatActivity {
             break;
 
             case R.id.button_set_wallpaper: {
-                File dir1 = getFilesDir();
-                String[] children = dir1.list();
-                for (String child : children) {
-                    new File(dir1, child).delete();
-                }
+
+                clearAppCache();
 
                 final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
                 final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
-                mShareButton.setClickable(false);
-                mDownloadButton.setClickable(false);
-                mDisplayView.setClickable(false);
-                mWallpaperButton.setClickable(false);
+                clickEvents(false);
                 mProgressBar.setVisibility(View.VISIBLE);
 
                 mImageStorageReference.getFile(displayImage)
@@ -184,10 +167,7 @@ public class MainActivity extends AppCompatActivity {
                                 Uri uri = FileProvider.getUriForFile(getApplicationContext(),
                                         getApplicationContext().getPackageName(), displayImage);
                                 setWall(uri); // startActivity probably needs UI thread
-                                mShareButton.setClickable(true);
-                                mDownloadButton.setClickable(true);
-                                mDisplayView.setClickable(true);
-                                mWallpaperButton.setClickable(true);
+                                clickEvents(true);
                                 mProgressBar.setVisibility(View.GONE);
                                 fadeOutAndHideImage(mOptionsView);
                             }
@@ -195,10 +175,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(@NonNull Exception exception) {
                         // TODO : Handle failed download
-                        mShareButton.setClickable(true);
-                        mDownloadButton.setClickable(true);
-                        mDisplayView.setClickable(true);
-                        mWallpaperButton.setClickable(true);
+                       clickEvents(true);
                         mProgressBar.setVisibility(View.GONE);
                         fadeOutAndHideImage(mOptionsView);
                     }
@@ -211,6 +188,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void clearAppCache() {
+        File dir1 = getFilesDir();
+        final String[] children = dir1.list();
+        for (String child : children) {
+            new File(dir1, child).delete();
+        }
+    }
+
+    private void clickEvents(Boolean check) {
+        mShareButton.setClickable(check);
+        mDownloadButton.setClickable(check);
+        mDisplayView.setClickable(check);
+        mWallpaperButton.setClickable(check);
+    }
+
     private void downloadImage() {
 
         final File dir = new File(Environment.getExternalStoragePublicDirectory(
@@ -220,9 +212,7 @@ public class MainActivity extends AppCompatActivity {
 
         final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         final File displayImage = new File(dir, "Fact_" + timeStamp + ".jpg");
-        mShareButton.setClickable(false);
-        mDownloadButton.setClickable(false);
-        mDisplayView.setClickable(false);
+        clickEvents(false);
         mProgressBar.setVisibility(View.VISIBLE);
 
         mImageStorageReference.getFile(displayImage)
@@ -231,9 +221,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
 
                         Toast.makeText(getApplicationContext(), "Fact downloaded successfully", Toast.LENGTH_SHORT).show();
-                        mShareButton.setClickable(true);
-                        mDownloadButton.setClickable(true);
-                        mDisplayView.setClickable(true);
+                        clickEvents(true);
                         mProgressBar.setVisibility(View.GONE);
                         fadeOutAndHideImage(mOptionsView);
 
@@ -244,9 +232,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFailure(@NonNull Exception exception) {
                 Toast.makeText(getApplicationContext(), "Failed to download fact", Toast.LENGTH_SHORT).show();
-                mShareButton.setClickable(true);
-                mDownloadButton.setClickable(true);
-                mDisplayView.setClickable(true);
+                clickEvents(true);
                 mProgressBar.setVisibility(View.GONE);
                 fadeOutAndHideImage(mOptionsView);
             }
