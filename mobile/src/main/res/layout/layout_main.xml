@@ -6,7 +6,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/black"
-    tools:context="com.roc.matteroffact.MainActivity">
+    tools:context="com.roc.matteroffact.MainActivity"
+    android:id="@+id/main_layout">
 
     <android.support.v7.widget.CardView xmlns:card_view="http://schemas.android.com/apk/res-auto"
         android:id="@+id/card_view"
@@ -37,6 +38,47 @@
         android:elevation="4dp"
         android:orientation="horizontal"
         android:visibility="gone">
+
+        <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:id="@+id/set_wallpaper_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_centerInParent="true"
+            android:layout_gravity="center_horizontal"
+            android:background="#bc000000"
+            android:gravity="center_vertical|center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/layoutButtons"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/wallpaper_with_fact"
+                    style="@style/Button"
+                    android:layout_width="200dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="16dp"
+                    android:onClick="handleClick"
+                    android:text="with fact" />
+
+                <Button
+                    android:id="@+id/wallpaper_without_fact"
+                    style="@style/Button"
+                    android:layout_width="200dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="16dp"
+                    android:onClick="handleClick"
+                    android:text="without fact" />
+            </LinearLayout>
+        </LinearLayout>
 
         <ImageButton
             android:id="@+id/button_download_image"

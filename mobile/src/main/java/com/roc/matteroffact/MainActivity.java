@@ -1,5 +1,7 @@
 package com.roc.matteroffact;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -12,10 +14,13 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewAnimationUtils;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -42,6 +47,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String DISPLAY_IMAGE_NAME = "displayImage.jpg";
 
     private boolean mIsDownloadPending = false;
+    private boolean isWallpaperOptionsVisible = false;
+
+    private int mXPos, mYPos;
 
     private StorageReference mSourceStorageReference, mImageStorageReference;
 
@@ -50,6 +58,23 @@ public class MainActivity extends AppCompatActivity {
     ImageView mDisplayView;
     ImageButton mShareButton, mDownloadButton, mWallpaperButton;
     ProgressBar mProgressBar;
+
+
+
+    // TODO : FIXME : Very bad coding. Clean up required!!!
+
+    // TODO : Do this in init view
+    // previously invisible view
+    View myView;
+    View layoutButtons;
+
+    // create the animator for this view (the start radius is zero)
+    Animator startAnim;
+    // create the end animation (the final radius is zero)
+    Animator endAnim;
+
+    Animation alphaAnimation;
+
 
     // TODO : Add wallpaper options
     // TODO : App logo?
@@ -75,6 +100,25 @@ public class MainActivity extends AppCompatActivity {
         mDownloadButton = (ImageButton) findViewById(R.id.button_download_image);
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
         mWallpaperButton = (ImageButton) findViewById(R.id.button_set_wallpaper);
+
+        myView = findViewById(R.id.set_wallpaper_layout);
+        layoutButtons = findViewById(R.id.layoutButtons);
+
+        alphaAnimation = AnimationUtils.loadAnimation(this, R.anim.alpha_anim);
+
+        myView.setVisibility(View.GONE);
+        layoutButtons.setVisibility(View.GONE);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        // MotionEvent object holds X-Y values
+        if(event.getAction() == MotionEvent.ACTION_DOWN) {
+            mXPos = (int) event.getX();
+            mYPos = (int) event.getY();
+        }
+
+        return super.dispatchTouchEvent(event);
     }
 
     private void initStorageReference() {
@@ -101,6 +145,9 @@ public class MainActivity extends AppCompatActivity {
                 if (!mOptionsView.isShown()) {
                     fadeInAndShowImage(mOptionsView);
                 } else {
+                    if (myView.isShown()) {
+                        hideWallpaperOptions(false);
+                    }
                     fadeOutAndHideImage(mOptionsView);
                 }
             }
@@ -154,32 +201,21 @@ public class MainActivity extends AppCompatActivity {
 
                 clearAppCache();
 
-                final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-                final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
-                clickEvents(false);
-                mProgressBar.setVisibility(View.VISIBLE);
+                if (!isWallpaperOptionsVisible) {
+                    revealWallpaperOptions();
+                } else {
+                    hideWallpaperOptions(false);
+                }
+            }
+            break;
 
-                mImageStorageReference.getFile(displayImage)
-                        .addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
-                            @Override
-                            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+            case R.id.wallpaper_with_fact : {
+                hideWallpaperOptions(true);
+            }
+            break;
 
-                                Uri uri = FileProvider.getUriForFile(getApplicationContext(),
-                                        getApplicationContext().getPackageName(), displayImage);
-                                setWall(uri); // startActivity probably needs UI thread
-                                clickEvents(true);
-                                mProgressBar.setVisibility(View.GONE);
-                                fadeOutAndHideImage(mOptionsView);
-                            }
-                        }).addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception exception) {
-                        // TODO : Handle failed download
-                       clickEvents(true);
-                        mProgressBar.setVisibility(View.GONE);
-                        fadeOutAndHideImage(mOptionsView);
-                    }
-                });
+            case R.id.wallpaper_without_fact : {
+                hideWallpaperOptions(true);
             }
             break;
 
@@ -194,6 +230,119 @@ public class MainActivity extends AppCompatActivity {
         for (String child : children) {
             new File(dir1, child).delete();
         }
+    }
+
+    private void revealWallpaperOptions() {
+
+        // get the center for the clipping circle
+        int cx = mOptionsView.getWidth();
+        int cy = mOptionsView.getHeight();
+
+        myView.setVisibility(View.VISIBLE);
+
+        // get the final radius for the clipping circle
+        float finalRadius = (float) Math.hypot(cx, cy);
+
+        startAnim =
+                ViewAnimationUtils.createCircularReveal(myView, mXPos, mYPos, 0, finalRadius);
+
+        // TODO : Code clean. Do not initialize views repeatedly.
+        isWallpaperOptionsVisible = true;
+
+        layoutButtons.setVisibility(View.GONE);
+
+        startAnim.setDuration(400);
+
+        startAnim.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animator) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animator) {
+                layoutButtons.setVisibility(View.VISIBLE);
+                layoutButtons.startAnimation(alphaAnimation);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animator) {
+
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animator) {
+
+            }
+        });
+
+        startAnim.start();
+    }
+
+    private void hideWallpaperOptions(final boolean fetchWallpaper) {
+
+        // get the center for the clipping circle
+        int cx = mOptionsView.getWidth();
+        int cy = mOptionsView.getHeight();
+
+        // get the initial radius for the clipping circle
+        float initialRadius = (float) Math.hypot(cx, cy);
+
+        endAnim =
+                ViewAnimationUtils.createCircularReveal(myView, mXPos, mYPos, initialRadius, 0);
+
+        // TODO : Code clean up
+        isWallpaperOptionsVisible = false;
+
+        // make the view invisible when the animation is done
+        endAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                myView.setVisibility(View.GONE);
+
+                if (fetchWallpaper) {
+                    fetchWallpaper();
+                }
+            }
+        });
+
+        // start the animation
+        endAnim.start();
+
+    }
+
+    private void fetchWallpaper() {
+
+        // TODO : Fetch wallpaper based on with / without fact
+        // TODO : Code clean up
+
+        final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
+        clickEvents(false);
+        mProgressBar.setVisibility(View.VISIBLE);
+
+        mImageStorageReference.getFile(displayImage)
+                .addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+
+                        Uri uri = FileProvider.getUriForFile(getApplicationContext(),
+                                getApplicationContext().getPackageName(), displayImage);
+                        setWall(uri); // startActivity probably needs UI thread
+                        clickEvents(true);
+                        mProgressBar.setVisibility(View.GONE);
+                        fadeOutAndHideImage(mOptionsView);
+                    }
+                }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                // TODO : Handle failed download
+                clickEvents(true);
+                mProgressBar.setVisibility(View.GONE);
+                fadeOutAndHideImage(mOptionsView);
+            }
+        });
     }
 
     private void clickEvents(Boolean check) {
