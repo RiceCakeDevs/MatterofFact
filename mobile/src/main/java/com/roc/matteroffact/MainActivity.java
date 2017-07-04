@@ -78,16 +78,7 @@ public class MainActivity extends AppCompatActivity {
         initStorageReference();
         showFact();
     }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        if (mOptionsView.isShown() && !mProgressBar.isShown()) {
-            mOptionsView.setVisibility(View.GONE);
-        }
-    }
-
+    
     private void initViews() {
 
         mDownloadButton   = (ImageButton) findViewById(R.id.button_download_image);
@@ -105,6 +96,17 @@ public class MainActivity extends AppCompatActivity {
 
         mWallpaperButtonsFadeInAnim = AnimationUtils.loadAnimation(
                 this, R.anim.wallpaper_options_reveal_anim);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (mIsWallpaperOptionsVisible) {
+            hideWallpaperOptions(false, false);
+        } else if (mOptionsView.isShown()) {
+            fadeOutAndHideView(mOptionsView);
+        } else {
+            super.onBackPressed();
+        }
     }
 
     @Override
