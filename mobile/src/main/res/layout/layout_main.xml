@@ -6,8 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/black"
-    tools:context="com.roc.matteroffact.MainActivity"
-    android:id="@+id/main_layout">
+    tools:context="com.roc.matteroffact.MainActivity">
 
     <android.support.v7.widget.CardView xmlns:card_view="http://schemas.android.com/apk/res-auto"
         android:id="@+id/card_view"
@@ -40,7 +39,7 @@
         android:visibility="gone">
 
         <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-            android:id="@+id/set_wallpaper_layout"
+            android:id="@+id/wallpaper_options_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_centerInParent="true"
@@ -51,7 +50,7 @@
             android:visibility="gone">
 
             <LinearLayout
-                android:id="@+id/layoutButtons"
+                android:id="@+id/wallpaper_buttons_view"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"

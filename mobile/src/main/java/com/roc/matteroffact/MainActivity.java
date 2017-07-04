@@ -4,9 +4,9 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
+import android.opengl.Visibility;
 import android.os.Build;
 import android.os.Environment;
 import android.support.annotation.NonNull;
@@ -23,6 +23,7 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
@@ -41,50 +42,36 @@ import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
 
-    // TODO : Replace this with our URL
-    public static final String SRC_URL = "gs://matteroffact-3c98e.appspot.com/";
+    // TODO : Fetch image based on date
+    private static final String SRC_URL = "gs://matteroffact-3c98e.appspot.com/";
     private static final String SRC_IMAGE_PATH = "Test/displayImage.jpg";
-    private static final String DISPLAY_IMAGE_NAME = "displayImage.jpg";
 
     private boolean mIsDownloadPending = false;
-    private boolean isWallpaperOptionsVisible = false;
+    private boolean mIsWallpaperOptionsVisible = false;
 
+    // Variables to map X & Y position on screen tap
     private int mXPos, mYPos;
 
+    // Firebase storage references to cloud storage object
     private StorageReference mSourceStorageReference, mImageStorageReference;
 
-    Bitmap mDisplayImage = null;
-    RelativeLayout mOptionsView;
+    // Variables to animate wallpaper options view and buttons
+    Animation mWallpaperButtonsFadeInAnim = null;
+
+    ImageButton mDownloadButton, mShareButton, mWallpaperButton;
     ImageView mDisplayView;
-    ImageButton mShareButton, mDownloadButton, mWallpaperButton;
+    LinearLayout mWallpaperButtons, mWallpaperOptions;
     ProgressBar mProgressBar;
+    RelativeLayout mOptionsView;
 
-
-
-    // TODO : FIXME : Very bad coding. Clean up required!!!
-
-    // TODO : Do this in init view
-    // previously invisible view
-    View myView;
-    View layoutButtons;
-
-    // create the animator for this view (the start radius is zero)
-    Animator startAnim;
-    // create the end animation (the final radius is zero)
-    Animator endAnim;
-
-    Animation alphaAnimation;
-
-
-    // TODO : Add wallpaper options
     // TODO : App logo?
     // TODO : hide options view onResume if download not in progress
     // TODO : Don't use hardcoded strings in java or xml
     // TODO : Create seperate dimens directories for different screen sizes
-    // TODO : Clean up code
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.layout_main);
 
         initViews();
@@ -92,26 +79,37 @@ public class MainActivity extends AppCompatActivity {
         showFact();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (mOptionsView.isShown() && !mProgressBar.isShown()) {
+            mOptionsView.setVisibility(View.GONE);
+        }
+    }
+
     private void initViews() {
 
-        mDisplayView = (ImageView) findViewById(R.id.display_image);
-        mOptionsView = (RelativeLayout) findViewById(R.id.options_view);
-        mShareButton = (ImageButton) findViewById(R.id.button_share_image);
-        mDownloadButton = (ImageButton) findViewById(R.id.button_download_image);
-        mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
-        mWallpaperButton = (ImageButton) findViewById(R.id.button_set_wallpaper);
+        mDownloadButton   = (ImageButton) findViewById(R.id.button_download_image);
+        mShareButton      = (ImageButton) findViewById(R.id.button_share_image);
+        mWallpaperButton  = (ImageButton) findViewById(R.id.button_set_wallpaper);
 
-        myView = findViewById(R.id.set_wallpaper_layout);
-        layoutButtons = findViewById(R.id.layoutButtons);
+        mDisplayView      = (ImageView) findViewById(R.id.display_image);
 
-        alphaAnimation = AnimationUtils.loadAnimation(this, R.anim.alpha_anim);
+        mWallpaperButtons = (LinearLayout) findViewById(R.id.wallpaper_buttons_view);
+        mWallpaperOptions = (LinearLayout) findViewById(R.id.wallpaper_options_view);
 
-        myView.setVisibility(View.GONE);
-        layoutButtons.setVisibility(View.GONE);
+        mProgressBar      = (ProgressBar) findViewById(R.id.progressBar);
+
+        mOptionsView      = (RelativeLayout) findViewById(R.id.options_view);
+
+        mWallpaperButtonsFadeInAnim = AnimationUtils.loadAnimation(
+                this, R.anim.wallpaper_options_reveal_anim);
     }
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
+
         // MotionEvent object holds X-Y values
         if(event.getAction() == MotionEvent.ACTION_DOWN) {
             mXPos = (int) event.getX();
@@ -125,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
 
         // TODO : Handle network connectivity issues.
         mSourceStorageReference = FirebaseStorage.getInstance().getReferenceFromUrl(SRC_URL);
-        mImageStorageReference = mSourceStorageReference.child(SRC_IMAGE_PATH);
+        mImageStorageReference  = mSourceStorageReference.child(SRC_IMAGE_PATH);
     }
 
     private void showFact() {
@@ -137,18 +135,21 @@ public class MainActivity extends AppCompatActivity {
                 .load(mImageStorageReference).crossFade(750).into(mDisplayView);
     }
 
-    public void handleClick(View v) {
+    public void handleClick(View view) {
 
-        switch (v.getId()) {
+        switch (view.getId()) {
 
             case R.id.display_image: {
+
                 if (!mOptionsView.isShown()) {
-                    fadeInAndShowImage(mOptionsView);
+                    fadeInAndShowView(mOptionsView);
                 } else {
-                    if (myView.isShown()) {
-                        hideWallpaperOptions(false);
+
+                    if (mWallpaperOptions.isShown()) {
+                        hideWallpaperOptions(false, true);
+                    } else {
+                        fadeOutAndHideView(mOptionsView);
                     }
-                    fadeOutAndHideImage(mOptionsView);
                 }
             }
             break;
@@ -157,32 +158,8 @@ public class MainActivity extends AppCompatActivity {
 
                 clearAppCache();
 
-                final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-                final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
-                clickEvents(false);
-                mProgressBar.setVisibility(View.VISIBLE);
-
-                mImageStorageReference.getFile(displayImage)
-                        .addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
-                            @Override
-                            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
-
-                                Uri uri = FileProvider.getUriForFile(getApplicationContext(),
-                                        getApplicationContext().getPackageName(), displayImage);
-                                share(uri); // startActivity probably needs UI thread
-                                clickEvents(true);
-                                mProgressBar.setVisibility(View.GONE);
-                                fadeOutAndHideImage(mOptionsView);
-                            }
-                        }).addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception exception) {
-                        // TODO : Handle failed download
-                        clickEvents(true);
-                        mProgressBar.setVisibility(View.GONE);
-                        fadeOutAndHideImage(mOptionsView);
-                    }
-                });
+                downloadFile(getDestFile(getFilesDir()),
+                        mImageStorageReference, R.id.button_share_image);
             }
             break;
 
@@ -193,7 +170,8 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                downloadImage();
+                downloadFile(getDestFile(getDownloadsDir()),
+                        mImageStorageReference, R.id.button_download_image);
             }
             break;
 
@@ -201,21 +179,21 @@ public class MainActivity extends AppCompatActivity {
 
                 clearAppCache();
 
-                if (!isWallpaperOptionsVisible) {
+                if (!mIsWallpaperOptionsVisible) {
                     revealWallpaperOptions();
                 } else {
-                    hideWallpaperOptions(false);
+                    hideWallpaperOptions(false, false);
                 }
             }
             break;
 
-            case R.id.wallpaper_with_fact : {
-                hideWallpaperOptions(true);
+            case R.id.wallpaper_with_fact: {
+                hideWallpaperOptions(true, false);
             }
             break;
 
-            case R.id.wallpaper_without_fact : {
-                hideWallpaperOptions(true);
+            case R.id.wallpaper_without_fact: {
+                hideWallpaperOptions(true, false);
             }
             break;
 
@@ -224,9 +202,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Deletes all files in application file directory
+     */
     private void clearAppCache() {
+
         File dir1 = getFilesDir();
-        final String[] children = dir1.list();
+
+        String[] children = dir1.list();
+
         for (String child : children) {
             new File(dir1, child).delete();
         }
@@ -234,162 +218,163 @@ public class MainActivity extends AppCompatActivity {
 
     private void revealWallpaperOptions() {
 
-        // get the center for the clipping circle
-        int cx = mOptionsView.getWidth();
-        int cy = mOptionsView.getHeight();
+        mIsWallpaperOptionsVisible = true;
 
-        myView.setVisibility(View.VISIBLE);
+        handleClickEvents(false);
+        mShareButton.setVisibility(View.INVISIBLE);
+        mDownloadButton.setVisibility(View.INVISIBLE);
 
-        // get the final radius for the clipping circle
-        float finalRadius = (float) Math.hypot(cx, cy);
+        Animator wallpaperOptionsRevealAnim = ViewAnimationUtils.createCircularReveal(
+                mWallpaperOptions, mXPos, mYPos, 0, getRadius());
 
-        startAnim =
-                ViewAnimationUtils.createCircularReveal(myView, mXPos, mYPos, 0, finalRadius);
+        mWallpaperOptions.setVisibility(View.VISIBLE);
+        mWallpaperButtons.setVisibility(View.GONE);
 
-        // TODO : Code clean. Do not initialize views repeatedly.
-        isWallpaperOptionsVisible = true;
-
-        layoutButtons.setVisibility(View.GONE);
-
-        startAnim.setDuration(400);
-
-        startAnim.addListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animator) {
-
-            }
-
+        wallpaperOptionsRevealAnim.setDuration(400);
+        wallpaperOptionsRevealAnim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animator) {
-                layoutButtons.setVisibility(View.VISIBLE);
-                layoutButtons.startAnimation(alphaAnimation);
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animator) {
-
+                mWallpaperButtons.setVisibility(View.VISIBLE);
+                mWallpaperButtons.startAnimation(mWallpaperButtonsFadeInAnim);
+                handleClickEvents(true);
+                mShareButton.setClickable(false);
+                mDownloadButton.setClickable(false);
             }
         });
 
-        startAnim.start();
+        wallpaperOptionsRevealAnim.start();
     }
 
-    private void hideWallpaperOptions(final boolean fetchWallpaper) {
+    private void hideWallpaperOptions(final boolean isDownloadRequired, final boolean hideOptionsView) {
 
-        // get the center for the clipping circle
-        int cx = mOptionsView.getWidth();
-        int cy = mOptionsView.getHeight();
+        mIsWallpaperOptionsVisible = false;
 
-        // get the initial radius for the clipping circle
-        float initialRadius = (float) Math.hypot(cx, cy);
+        handleClickEvents(false);
 
-        endAnim =
-                ViewAnimationUtils.createCircularReveal(myView, mXPos, mYPos, initialRadius, 0);
+        Animator wallpaperOptionsHideAnim = ViewAnimationUtils.createCircularReveal(
+                mWallpaperOptions, mXPos, mYPos, getRadius(), 0);
 
-        // TODO : Code clean up
-        isWallpaperOptionsVisible = false;
-
-        // make the view invisible when the animation is done
-        endAnim.addListener(new AnimatorListenerAdapter() {
+        wallpaperOptionsHideAnim.setDuration(400);
+        wallpaperOptionsHideAnim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
-                myView.setVisibility(View.GONE);
+                mWallpaperOptions.setVisibility(View.GONE);
+                mShareButton.setVisibility(View.VISIBLE);
+                mDownloadButton.setVisibility(View.VISIBLE);
 
-                if (fetchWallpaper) {
-                    fetchWallpaper();
+                if (isDownloadRequired) {
+                    downloadFile(getDestFile(getFilesDir()),
+                            mImageStorageReference, R.id.button_set_wallpaper);
+                } else {
+                    handleClickEvents(true);
+                }
+
+                if (hideOptionsView) {
+                    fadeOutAndHideView(mOptionsView);
+                    handleClickEvents(true);
                 }
             }
         });
 
-        // start the animation
-        endAnim.start();
-
+        wallpaperOptionsHideAnim.start();
     }
 
-    private void fetchWallpaper() {
 
-        // TODO : Fetch wallpaper based on with / without fact
-        // TODO : Code clean up
+    /**
+     * Downloads file from Firebase StorageReference src and stores it in
+     * file dest on device.
+     * @param dest The destination where file is to be downloaded to.
+     * @param src  The StorageReference from where the file is to be downloaded.
+     * @param id   The id of the item that has requested for download. This is
+     *             used to handle file once download is successful.
+     */
+    private void downloadFile(final File dest, StorageReference src, final int id) {
 
-        final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        final File displayImage = new File(getFilesDir(), "Fact_" + timeStamp + ".jpg");
-        clickEvents(false);
+        handleClickEvents(false);
         mProgressBar.setVisibility(View.VISIBLE);
 
-        mImageStorageReference.getFile(displayImage)
+        src.getFile(dest)
                 .addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
                     @Override
                     public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
 
-                        Uri uri = FileProvider.getUriForFile(getApplicationContext(),
-                                getApplicationContext().getPackageName(), displayImage);
-                        setWall(uri); // startActivity probably needs UI thread
-                        clickEvents(true);
-                        mProgressBar.setVisibility(View.GONE);
-                        fadeOutAndHideImage(mOptionsView);
+                        handleOnFileDownloaded(id, dest);
+
                     }
                 }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
-                // TODO : Handle failed download
-                clickEvents(true);
-                mProgressBar.setVisibility(View.GONE);
-                fadeOutAndHideImage(mOptionsView);
+
+                handleOnFileDownloadFailed();
             }
         });
     }
 
-    private void clickEvents(Boolean check) {
-        mShareButton.setClickable(check);
-        mDownloadButton.setClickable(check);
-        mDisplayView.setClickable(check);
-        mWallpaperButton.setClickable(check);
+    private void handleOnFileDownloaded(int id, File downloadedFile) {
+
+        initViewsAfterDownloadResult();
+
+        switch (id) {
+
+            case R.id.button_share_image: {
+
+                Uri uri = FileProvider.getUriForFile(getApplicationContext(),
+                        getApplicationContext().getPackageName(), downloadedFile);
+
+                share(uri);
+            }
+            break;
+
+            case R.id.button_download_image: {
+                Toast.makeText(getApplicationContext(),
+                        "Fact downloaded successfully", Toast.LENGTH_SHORT).show();
+
+                MediaScannerConnection.scanFile(getApplicationContext(),
+                        new String[]{downloadedFile.getAbsolutePath()},
+                        new String[]{"image/jpeg"}, null);
+            }
+            break;
+
+            case R.id.button_set_wallpaper: {
+
+                Uri uri = FileProvider.getUriForFile(getApplicationContext(),
+                        getApplicationContext().getPackageName(), downloadedFile);
+
+                setWallpaper(uri);
+            }
+            break;
+
+            default:
+                break;
+        }
     }
 
-    private void downloadImage() {
+    private void handleOnFileDownloadFailed() {
 
-        final File dir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS), "Matter of Fact");
+        initViewsAfterDownloadResult();
+        Toast.makeText(getApplicationContext(),
+                "Something went wrong. Try again soon.", Toast.LENGTH_SHORT).show();
+    }
 
-        dir.mkdirs();
+    private void initViewsAfterDownloadResult() {
 
-        final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        final File displayImage = new File(dir, "Fact_" + timeStamp + ".jpg");
-        clickEvents(false);
-        mProgressBar.setVisibility(View.VISIBLE);
+        handleClickEvents(true);
+        mProgressBar.setVisibility(View.GONE);
+        fadeOutAndHideView(mOptionsView);
+    }
 
-        mImageStorageReference.getFile(displayImage)
-                .addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
-                    @Override
-                    public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
-
-                        Toast.makeText(getApplicationContext(), "Fact downloaded successfully", Toast.LENGTH_SHORT).show();
-                        clickEvents(true);
-                        mProgressBar.setVisibility(View.GONE);
-                        fadeOutAndHideImage(mOptionsView);
-
-                        MediaScannerConnection.scanFile(getApplicationContext(),
-                                new String[]{displayImage.getAbsolutePath()}, new String[]{"image/jpeg"}, null);
-                    }
-                }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                Toast.makeText(getApplicationContext(), "Failed to download fact", Toast.LENGTH_SHORT).show();
-                clickEvents(true);
-                mProgressBar.setVisibility(View.GONE);
-                fadeOutAndHideImage(mOptionsView);
-            }
-        });
+    private void handleClickEvents(boolean isEnabled) {
+        mShareButton.setClickable(isEnabled);
+        mDownloadButton.setClickable(isEnabled);
+        mDisplayView.setClickable(isEnabled);
+        mWallpaperButton.setClickable(isEnabled);
     }
 
     private void share(Uri result) {
+
         Intent intent = new Intent(Intent.ACTION_SEND);
+
         intent.setType("image/jpeg");
         intent.putExtra(Intent.EXTRA_SUBJECT, "Fact for the day");
         intent.putExtra(Intent.EXTRA_TEXT, "Hey! As a matter of fact, did you know this?");
@@ -398,23 +383,27 @@ public class MainActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(intent, "Share image"));
     }
 
-    private void setWall(Uri result) {
+    private void setWallpaper(Uri result) {
+
         Intent intent = new Intent(Intent.ACTION_ATTACH_DATA);
+
         intent.setDataAndType(result, "image/*");
         intent.putExtra("mimeType", "image/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(
-                intent, "Set as:"));
+
+        startActivity(Intent.createChooser(intent, "Set as:"));
     }
 
-    private void fadeOutAndHideImage(final View img) {
+    private void fadeOutAndHideView(final View view) {
+
         Animation fadeOut = new AlphaAnimation(1, 0);
+
         fadeOut.setInterpolator(new AccelerateInterpolator());
         fadeOut.setDuration(350);
 
         fadeOut.setAnimationListener(new Animation.AnimationListener() {
             public void onAnimationEnd(Animation animation) {
-                img.setVisibility(View.GONE);
+                view.setVisibility(View.GONE);
             }
 
             public void onAnimationRepeat(Animation animation) {
@@ -424,13 +413,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        img.startAnimation(fadeOut);
+        view.startAnimation(fadeOut);
     }
 
-    private void fadeInAndShowImage(final View img) {
-        img.setVisibility(View.VISIBLE);
+    private void fadeInAndShowView(final View view) {
+
+        view.setVisibility(View.VISIBLE);
 
         Animation fadeIn = new AlphaAnimation(0, 1);
+
         fadeIn.setInterpolator(new AccelerateInterpolator());
         fadeIn.setDuration(250);
 
@@ -445,37 +436,104 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        img.startAnimation(fadeIn);
+        view.startAnimation(fadeIn);
     }
 
+    /**
+     * Method to check if our application has the required permissions.
+     * If required permissions are not granted, request permission from user.
+     *
+     * @return true,  if required permissions are granted.
+     *         false, if required permissions are not granted.
+     */
     public boolean isStoragePermissionGranted() {
+
         if (Build.VERSION.SDK_INT >= 23) {
+
             if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     == PackageManager.PERMISSION_GRANTED) {
+
+                // Permission is already granted. So return true;
                 return true;
             } else {
 
-                ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+                // We do not have write permission to save file to external storage
+                // Request permission from user.
+                String[] permissions = new String[] {
+                        android.Manifest.permission.WRITE_EXTERNAL_STORAGE};
+
+                ActivityCompat.requestPermissions(this, permissions, 1);
+
                 return false;
             }
-        } else { //permission is automatically granted on sdk<23 upon installation
+
+        } else {
+
+            // Permission is automatically granted on sdk < 23 upon installation,
+            // So return true.
             return true;
         }
     }
 
+    /**
+     * Callback method for result of requestPermissions.
+     * @param requestCode  The request code passed in requestPermissions.
+     * @param permissions  The requested permissions.
+     * @param grantResults The grant results for the corresponding permissions.
+     */
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode,
+                                           String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         if (grantResults[0] == PackageManager.PERMISSION_GRANTED && mIsDownloadPending) {
-            //resume tasks needing this permission
-            downloadImage();
+
+            // Required permission is granted.
+            // Resume any pending tasks that required this permission.
+            downloadFile(getDestFile(getDownloadsDir()),
+                    mImageStorageReference, R.id.button_download_image);
         } else {
-            Toast.makeText(getApplicationContext(), "Can't save image. Please provide the required permission.", Toast.LENGTH_SHORT).show();
-            mShareButton.setClickable(true);
-            mDownloadButton.setClickable(true);
-            mDisplayView.setClickable(true);
-            mProgressBar.setVisibility(View.GONE);
-            fadeOutAndHideImage(mOptionsView);
+
+            // User denied the permission. Show toast. 
+            Toast.makeText(getApplicationContext(), "Can't save image. " +
+                    "Please provide the required permission.", Toast.LENGTH_SHORT).show();
+            initViewsAfterDownloadResult();
         }
+    }
+
+    private File getDownloadsDir() {
+
+        File dir = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS), getString(R.string.app_name));
+        dir.mkdirs();
+
+        return dir;
+    }
+
+    private File getDestFile(File destDir) {
+
+        String timeStamp =
+                new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+
+        File destFile = new File(destDir, "Fact_" + timeStamp + ".jpg");
+
+        return destFile;
+    }
+
+    private float getRadius() {
+
+        float radius = 0.0f;
+
+        if (mOptionsView != null) {
+
+            // The center for the clipping circle
+            int cx = mOptionsView.getWidth();
+            int cy = mOptionsView.getHeight();
+
+            // The radius for the clipping circle
+            radius = (float) Math.hypot(cx, cy);
+        }
+
+        return radius;
     }
 }
